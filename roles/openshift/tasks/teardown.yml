@@ -1,0 +1,10 @@
+---
+- name: Check if the file {{ playbook_dir }}/install-dir/metadata.json exists
+  stat:
+    path: "{{ playbook_dir }}/install-dir/metadata.json"
+  register: install_metadata
+
+- name: Destroy OpenShift Cluster
+  command: "openshift-install destroy cluster --dir={{ playbook_dir }}/install-dir"
+  when: install_metadata.stat.exists
+  changed_when: false

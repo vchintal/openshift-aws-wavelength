@@ -1,0 +1,15 @@
+---
+- hosts: localhost
+  gather_facts: false
+  environment:
+    PATH: "{{ playbook_dir }}/bin:{{ ansible_env.PATH }}"
+  tasks:
+    - name: Run the prerequisite tasks
+      import_role:
+        name: prerequisites
+    - name: Run the tasks from the aws module
+      import_role:
+        name: aws
+    - name: Run the tasks from the openshift module
+      import_role:
+        name: openshift

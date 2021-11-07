@@ -1,0 +1,12 @@
+- name: Unarchive oc client
+  unarchive:
+    src: "{{ playbook_dir }}/downloads/oc_client.tar.gz"
+    dest: "{{ playbook_dir }}/bin"
+    mode: '0775'
+  when: oc_client_download is changed
+
+- name: Unarchive openshift-install
+  unarchive:
+    src: "{{ playbook_dir }}/downloads/openshift_install.tar.gz"
+    dest: "{{ playbook_dir }}/bin"
+    mode: '0775'

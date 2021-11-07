@@ -1,0 +1,59 @@
+- name: Copy the the 99_openshift-cluster-api_worker-machineset-{{ index }}.yml file for wavelength machine set
+  copy:
+    src: "{{ playbook_dir }}/install-dir/openshift/99_openshift-cluster-api_worker-machineset-{{ index }}.yaml"
+    dest: "{{ playbook_dir }}/install-dir/openshift/99_openshift-cluster-api_wavelength-machineset-{{ index }}.yaml"
+    mode: 0644
+
+- name: Consume the 99_openshift-cluster-api_worker-machineset-{{ index }}.yml file into a dictionary item
+  include_vars:
+    file: "{{ playbook_dir }}/install-dir/openshift/99_openshift-cluster-api_worker-machineset-{{ index }}.yaml"
+    name: machine_set
+
+- name: Retrieve the zone_name and subnet_id from the yaml
+  set_fact:
+    zone_name: "{{ machine_set.spec.template.spec.providerSpec.value.placement.availabilityZone }}"
+    subnet_id: "{{ machine_set.spec.template.spec.providerSpec.value.subnet.id }}"
+
+- name: Display both the zone_name and subnet_id
+  debug:
+    msg: "Zone Name: {{ zone_name }}, Subnet ID: {{ subnet_id }}"
+
+- name: Search/Replace zone-name in the entire file
+  replace:
+    path: "{{ playbook_dir }}/install-dir/openshift/99_openshift-cluster-api_wavelength-machineset-{{ index }}.yaml"
+    regexp: "{{ zone_name }}"
+    replace: "{{ item.zone_name }}"
+    backup: true
+
+- name: Search/Replace subnet_id in the entire file
+  replace:
+    path: "{{ playbook_dir }}/install-dir/openshift/99_openshift-cluster-api_wavelength-machineset-{{ index }}.yaml"
+    regexp: "{{ subnet_id }}"
+    replace: "{{ item.subnet_id }}"
+
+- name: Search/Replace worker in metadata.name with wavelength
+  replace:
+    path: "{{ playbook_dir }}/install-dir/openshift/99_openshift-cluster-api_wavelength-machineset-{{ index }}.yaml"
+    regexp: 'name: (.+)-worker-(.+)$'
+    before: 'spec:'
+    replace: 'name: \1-wavelength-\2'
+
+- name: Search/Replace worker in labels with wavelength
+  replace:
+    path: "{{ playbook_dir }}/install-dir/openshift/99_openshift-cluster-api_wavelength-machineset-{{ index }}.yaml"
+    regexp: 'machine.openshift.io/cluster-api-machineset: (.+)-worker-(.+)$'
+    replace: 'machine.openshift.io/cluster-api-machineset: \1-wavelength-\2'
+
+- name: Search/Replace worker role and type with wavelength
+  replace:
+    path: "{{ playbook_dir }}/install-dir/openshift/99_openshift-cluster-api_wavelength-machineset-{{ index }}.yaml"
+    regexp: 'machine.openshift.io/cluster-api-machine-(.+): worker$'
+    replace: 'machine.openshift.io/cluster-api-machine-\1: wavelength'
+
+- name: Set the node role to wavelength
+  replace:
+    path: "{{ playbook_dir }}/install-dir/openshift/99_openshift-cluster-api_wavelength-machineset-{{ index }}.yaml"
+    regexp: 'metadata: {}'
+    after: 'spec:'
+    before: 'providerSpec:'
+    replace: "metadata: {labels: {node-role.kubernetes.io/wavelength: ''}}"

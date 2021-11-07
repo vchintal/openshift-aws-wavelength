@@ -1,0 +1,19 @@
+---
+# # Uncomment the following section if you need to create hosted zone with very new run
+# # Keep the following commented if you would like to reuse the created hosted zone
+# - name: Delete the public hosted zone
+#   route53_zone:
+#     zone: "{{ aws.hosted_zone_name }}"
+#     state: absent
+
+- name: Delete the Carrier Gateway and associated resources
+  amazon.aws.cloudformation:
+    stack_name: "openshift-aws-wavelength-carrier-gateway-stack"
+    state: "absent"
+    region: "{{ aws.region }}"
+
+- name: Delete the VPC and associated resources
+  amazon.aws.cloudformation:
+    stack_name: "openshift-aws-wavelength-vpc-stack"
+    state: "absent"
+    region: "{{ aws.region }}"

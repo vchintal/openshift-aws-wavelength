@@ -1,0 +1,139 @@
+---
+- name: Create the VPC
+  amazon.aws.cloudformation:
+    stack_name: "openshift-aws-wavelength-vpc-stack"
+    state: "present"
+    region: "{{ aws.region }}"
+    disable_rollback: false
+    template_body: "{{ lookup('template', 'vpc-cf.yml.j2') }}"
+    template_parameters:
+      SubnetBits: "{{ aws.vpc_subnet_bits }}"
+      AvailabilityZoneCount: 3
+      VpcCidr: "{{ aws.vpc_cidr }}"
+  register: vpc_stack
+
+- name: Debug VPC information
+  debug:
+    var: vpc_stack
+    verbosity: 1
+
+- name: Create the Carrier Gateway
+  amazon.aws.cloudformation:
+    stack_name: "openshift-aws-wavelength-carrier-gateway-stack"
+    state: "present"
+    region: "{{ aws.region }}"
+    disable_rollback: false
+    template_body: "{{ lookup('template', 'carrier-gateway-cf.yml.j2') }}"
+    template_parameters:
+      VpcId: "{{ vpc_stack.stack_outputs.VpcId }}"
+      SubnetBits: "{{ aws.vpc_subnet_bits }}"
+      VpcCidr: "{{ aws.vpc_cidr }}"
+  register: carrier_gateway_stack
+
+- name: Debug Carrier Gateway information
+  debug:
+    var: carrier_gateway_stack
+    verbosity: 1
+
+- name: Create a public hosted zone
+  route53_zone:
+    zone: "{{ aws.hosted_zone_name }}"
+    comment: "{{ aws.project }} Hosted Zone"
+    state: present
+
+- name: Get all the list of subnets available
+  amazon.aws.ec2_vpc_subnet_info:
+    region: "{{ aws.region }}"
+    filters:
+      vpc-id: "{{ vpc_stack.stack_outputs.VpcId }}"
+  register: subnet_info
+
+- name: Debug all subnets associated with the VPC
+  debug:
+    var: subnet_info
+    verbosity: 1
+
+- name: Capture the list of all availability zone ids
+  set_fact:
+    all_availability_zone_ids: "{{ subnet_info.subnets|map(attribute='availability_zone_id')|list }}"
+
+- name: Get the availability zone info based on ids
+  amazon.aws.aws_az_info:
+    region: "{{ aws.region }}"
+    filters:
+      zone-id: "{{ item }}"
+  loop: "{{ all_availability_zone_ids }}"
+  register: zone_info
+
+- name: Debug availability zone info based on the captured availability_zone_ids
+  debug:
+    var: zone_info
+    verbosity: 1
+
+- name: Build the control plane availability zones
+  set_fact:
+    aws: "{{ aws | combine({'control_plane_zones': aws.control_plane_zones + [ item.availability_zones[0].zone_name ] }, recursive=True) }}"
+  loop: "{{ zone_info.results }}"
+  when: item.availability_zones[0].zone_type == "availability-zone"
+
+- name: Debug the control plane availability zones
+  debug:
+    var: aws.control_plane_zones
+    verbosity: 1
+
+- name: Build the list of { zone_name, subnet_id } pairs
+  set_fact:
+    aws: "{{ aws | combine({'wavelength_az_subnet_list': aws.wavelength_az_subnet_list + [ { 'zone_name': subnet_info.subnets[index].availability_zone, 'subnet_id': subnet_info.subnets[index].id }] }, recursive=True) }}"
+  loop: "{{ subnet_info.subnets|map(attribute='id')|list }}"
+  loop_control:
+    index_var: index
+  when: subnet_info.subnets[index].availability_zone not in aws.control_plane_zones
+
+- name: Get the list of all subnet ids
+  set_fact:
+    aws: "{{ aws | combine({'subnets': aws.subnets + [ item ]}, recursive=True) }}"
+  loop: "{{ subnet_info.subnets|map(attribute='id')|list }}"
+  loop_control:
+    index_var: index
+  when: subnet_info.subnets[index].availability_zone in aws.control_plane_zones
+
+- name: Copy the install-config.yaml to the install-dir
+  template:
+    src: install-config.yaml.j2
+    dest: "{{ playbook_dir }}/install-dir/install-config.yaml"
+    mode: 0755
+
+- name: Create a dictionary out of the install-config.yaml file
+  include_vars:
+    file: "{{ playbook_dir }}/install-dir/install-config.yaml"
+    name: install_config
+
+- name: Get the compute section's first element
+  set_fact:
+    compute_config: "{{ install_config.compute[0] }}"
+
+- name: Replace the AWS platform compute zones with control plane zones
+  set_fact:
+    compute_config: "{{ compute_config | combine({'platform': {'aws':{'zones': aws.control_plane_zones | unique}}}, recursive=True) }}"
+
+- name: Save the compute's configuration back into install-config.yaml
+  set_fact:
+    install_config: "{{ install_config | combine({'compute': [ compute_config ]}, recursive=True) }}"
+
+- name: Set the list of AWS platform control plane zones
+  set_fact:
+    install_config: "{{ install_config | combine({'controlPlane': {'platform': {'aws': {'zones': aws.control_plane_zones | unique } }}}, recursive=True) }}"
+
+- name: Set the AWS platform subnets
+  set_fact:
+    install_config: "{{ install_config | combine({'platform': { 'aws': {'subnets': aws.subnets|unique } } }, recursive=True) }}"
+
+- name: Set the sshKey in the install-config.yaml
+  set_fact:
+    install_config: "{{ install_config | combine({'sshKey': lookup('file', '~/.ssh/ocp-aws-wavelength.pub') }, recursive=True) }}"
+
+- name: Convert the install_config dict back into YAML for installation
+  copy:
+    content: "{{ install_config | to_yaml }}"
+    dest: "{{ playbook_dir }}/install-dir/install-config.yaml"
+    mode: '0664'

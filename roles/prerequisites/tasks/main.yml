@@ -1,0 +1,66 @@
+---
+- name: Create ~/.ssh directory if it does not exist
+  file:
+    path: ~/.ssh
+    state: directory
+    mode: '0755'
+
+- name: Generate a SSH key-pair
+  openssh_keypair:
+    path: ~/.ssh/ocp-aws-wavelength
+    force: false
+
+- name: Clean up existing bin, install-dir and downloads folders
+  file:
+    path: "{{ playbook_dir }}/{{ item }}"
+    state: absent
+  loop: ["bin", "install-dir", "downloads"]
+  when: clean is defined
+
+- name: Must always clean install-dir
+  file:
+    path: "{{ playbook_dir }}/{{ item }}"
+    state: absent
+  loop: ["install-dir"]
+  when: clean is not defined
+
+- name: Create bin, install-dir and downloads folders
+  file:
+    path: "{{ playbook_dir }}/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: ["bin", "downloads", "install-dir"]
+
+- name: Fetch the content of the sha256sum.txt from the clients downloads page
+  uri:
+    url: "{{ openshift.download.clients_url }}/sha256sum.txt"
+    return_content: true
+  register: clients_content
+
+- name: Set the downloads
+  set_fact:
+    downloads: "{{ openshift.download }}"
+
+- name: Set the download facts for localhost, which will be used later
+  set_fact:
+    downloads: "{{ downloads | combine({ item.key : item.value }, recursive=True) }}"
+  when: inventory_hostname == "localhost"
+  loop:
+    - {key: "openshiftClient", value: "{{ openshift.download.clients_url }}/{{ clients_content.content | regex_search('openshift-client-linux-.*.tar.gz') }}"}
+    - {key: "openshiftInstall", value: "{{ openshift.download.clients_url }}/{{ clients_content.content | regex_search('openshift-install-linux-.*.tar.gz') }}"}
+
+- name: Download the oc client binary
+  get_url:
+    url: "{{ downloads.openshiftClient }}"
+    dest: "{{ playbook_dir }}/downloads/oc_client.tar.gz"
+    validate_certs: false
+  notify:
+    - Unarchive oc client
+
+- name: Download the openshift-install binary
+  get_url:
+    url: "{{ downloads.openshiftInstall }}"
+    dest: "{{ playbook_dir }}/downloads/openshift_install.tar.gz"
+    validate_certs: false
+  notify:
+    - Unarchive openshift-install

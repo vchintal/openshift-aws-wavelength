@@ -1,0 +1,56 @@
+---
+- name: Backup the install-config.yaml
+  copy:
+    src: "{{ playbook_dir }}/install-dir/install-config.yaml"
+    dest: "{{ playbook_dir }}/install-dir/install-config.yaml.orig"
+    mode: 0644
+
+- name: Generate OpenShift install manifests
+  command: "openshift-install create manifests --dir={{ playbook_dir }}/install-dir"
+  changed_when: false
+
+- name: Copy the cluster-network-02-config.yml file into cluster-network-03-config.yml
+  copy:
+    src: "{{ playbook_dir }}/install-dir/manifests/cluster-network-02-config.yml"
+    dest: "{{ playbook_dir }}/install-dir/manifests/cluster-network-03-config.yml"
+    mode: 0644
+
+- name: Replace the apiVersion in cluster-network-03-config.yml
+  replace:
+    path: "{{ playbook_dir }}/install-dir/manifests/cluster-network-03-config.yml"
+    regexp: "apiVersion: config.openshift.io/v1"
+    replace: "apiVersion: operator.openshift.io/v1"
+    before: "kind: Network"
+
+- name: Remove networkType line from the cluster-network-03-config.yml
+  lineinfile:
+    path: "{{ playbook_dir }}/install-dir/manifests/cluster-network-03-config.yml"
+    regexp: 'networkType: .+$'
+    state: absent
+
+- name: Create a dictionary out of the cluster-network-03-config.yml file
+  include_vars:
+    file: "{{ playbook_dir }}/install-dir/manifests/cluster-network-03-config.yml"
+    name: network_config
+
+- name: Append the openshift.network_config to the created network_config
+  set_fact:
+    network_config: "{{ network_config | combine({'spec': {'defaultNetwork': openshift.default_network}}, recursive=True) }}"
+
+- name: Convert the network_config dict back into YAML in file cluster-network-03-config.yml
+  copy:
+    content: "{{ network_config | to_yaml }}"
+    dest: "{{ playbook_dir }}/install-dir/manifests/cluster-network-03-config.yml"
+    mode: '0664'
+
+- name: Backup the cluster-network-03-config.yml file
+  copy:
+    src: "{{ playbook_dir }}/install-dir/manifests/cluster-network-03-config.yml"
+    dest: "{{ playbook_dir }}/install-dir/manifests/cluster-network-03-config.yml.orig"
+    mode: 0644
+
+- name: Read each of the MachineSets are change them
+  include: create-wavelength-machineset.yml
+  loop: "{{ aws.wavelength_az_subnet_list }}"
+  loop_control:
+    index_var: index

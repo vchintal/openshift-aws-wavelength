@@ -1,0 +1,27 @@
+---
+aws:
+  project: OpenShift on AWS Wavelength  # required, can be customized
+  region: us-west-2  # required, can be customized
+  vpc_cidr: 10.0.0.0/16  # required, can be customized
+  vpc_subnet_bits: 12  # required, can be customized
+  hosted_zone_name: aws.vchintal.xyz  # required, customized
+  control_plane_zones: []  # required, keep it empty
+  compute_zones:  # required, custom
+    - us-west-2-wl1-sfo-wlz-1
+    - us-west-2-wl1-phx-wlz-1
+  wavelength_az_subnet_list: []  # required, keep it empty
+  subnets: []  # required and keep it empty
+openshift:
+  base_domain: aws.vchintal.xyz  # required, can be customized
+  cluster_name: ocp  # required, can be customized
+  pull_secret: |  # required, must be customized
+    << replace >>
+  ssh_key: ''  # required and keep it empty
+  download:
+    clients_url: https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest  # required, do not change
+  default_network:  # required, do not change
+    type: OpenShiftSDN
+    openshiftSDNConfig:
+      mode: NetworkPolicy
+      mtu: 1188
+      vxlanPort: 4789

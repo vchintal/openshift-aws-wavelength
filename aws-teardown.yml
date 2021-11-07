@@ -1,0 +1,8 @@
+---
+- hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Run the tasks from the aws module
+      import_role:
+        name: aws
+        tasks_from: teardown

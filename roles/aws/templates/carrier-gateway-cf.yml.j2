@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Setup Carrier Gateway in the VPC
+Parameters:
+  VpcId:
+    Description: VPC ID
+    Type: String
+  VpcCidr:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-4]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
+    Default: 10.0.0.0/16
+    Description: CIDR block for VPC.
+    Type: String
+  SubnetBits:
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/19-27.
+    MinValue: 5
+    MaxValue: 13
+    Default: 12
+    Description: "Size of each subnet to create within the availability zones. (Min: 5 = /27, Max: 13 = /19)"
+    Type: Number
+
+Resources:
+  CarrierGateway:
+    Type: AWS::EC2::CarrierGateway
+    Properties: 
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: "{{ aws.project }} Carrier Gateway"
+  CarrierGatewayRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VpcId
+      Tags:
+        - Key: Name
+          Value: "{{ aws.project }} Carrier Gateway Route Table" 
+  CarrierGatewayRoute:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId: !Ref CarrierGatewayRouteTable
+      CarrierGatewayId: !Ref CarrierGateway
+      DestinationCidrBlock: 0.0.0.0/0
+  CarrierGatewaySubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VpcId
+      CidrBlock: !Select [6, !Cidr [!Ref VpcCidr, 9, !Ref SubnetBits]]
+      AvailabilityZone: {{ aws.compute_zones[0] }}
+      Tags:
+        - Key: Name
+          Value: "{{ aws.project }} Carrier Gateway Subnet 1"
+  CarrierGatewaySubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref CarrierGatewaySubnet
+      RouteTableId: !Ref CarrierGatewayRouteTable
+
+  CarrierGatewaySubnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VpcId
+      CidrBlock: !Select [7, !Cidr [!Ref VpcCidr, 9, !Ref SubnetBits]]
+      AvailabilityZone: {{ aws.compute_zones[1] }}
+      Tags:
+        - Key: Name
+          Value: "{{ aws.project }} Carrier Gateway Subnet 2"
+  CarrierGatewaySubnetRouteTableAssociation1:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref CarrierGatewaySubnet1
+      RouteTableId: !Ref CarrierGatewayRouteTable

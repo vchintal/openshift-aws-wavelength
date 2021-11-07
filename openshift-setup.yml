@@ -1,0 +1,9 @@
+---
+- hosts: localhost
+  gather_facts: false
+  environment:
+    PATH: "{{ playbook_dir }}/bin:{{ ansible_env.PATH }}"
+  tasks:
+    - name: Run the tasks from the aws module
+      import_role:
+        name: openshift
