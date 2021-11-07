@@ -12,6 +12,10 @@ The automation will do the following:
    * Using the `install-config.yaml` to generate the install manifests
    * Create exactly two `MachineSets` of node/role type of `wavelength` set to run in Wavelength zones/subnets
 
+This repo was possible due to the brilliant work of Ashish Aggarwal of Red Hat
+* [Running an OpenShift Worker Node on AWS Wavelength for Edge Applications](https://cloud.redhat.com/blog/running-an-openshift-worker-node-on-aws-wavelength-for-edge-applications)
+* [Building your first Red Hat OpenShift cluster on Verizon 5G Edge](https://verizon5gedgeblog.medium.com/building-your-first-red-hat-openshift-cluster-on-verizon-5g-edge-f9c2f07e8f20)
+  
 ## Prerequisites
 
 * Linux host  (Fedora 33+/RHEL 8) with the following installed 
