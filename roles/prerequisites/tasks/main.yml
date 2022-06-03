@@ -54,13 +54,22 @@
     url: "{{ downloads.openshiftClient }}"
     dest: "{{ playbook_dir }}/downloads/oc_client.tar.gz"
     validate_certs: false
-  notify:
-    - Unarchive oc client
 
 - name: Download the openshift-install binary
   get_url:
     url: "{{ downloads.openshiftInstall }}"
     dest: "{{ playbook_dir }}/downloads/openshift_install.tar.gz"
     validate_certs: false
-  notify:
-    - Unarchive openshift-install
+
+- name: Unarchive oc client
+  unarchive:
+    src: "{{ playbook_dir }}/downloads/oc_client.tar.gz"
+    dest: "{{ playbook_dir }}/bin"
+    mode: '0775'
+
+- name: Unarchive openshift-install
+  unarchive:
+    src: "{{ playbook_dir }}/downloads/openshift_install.tar.gz"
+    dest: "{{ playbook_dir }}/bin"
+    mode: '0775'
+
